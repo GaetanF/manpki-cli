@@ -5,6 +5,7 @@ import requests
 import requests_unixsocket
 import json
 import getpass
+import urllib3
 from jose import jws
 from ..constants import *
 from ..logger import log
@@ -17,8 +18,7 @@ def get_socket_file(paths=None):
         log.debug("Get socket file")
     if paths is None:
         paths = [os.path.join(path, 'manpki.sock')
-                 for path in ['/var/run/manpkid', '/var/run', '/tmp',
-                              '/var/tmp/manpkid', './']]
+                 for path in ['/var/run/manpki', '/run/manpki', os.path.expanduser('~/.manpki')]]
     for path in paths:
         if os.path.exists(path) and stat.S_ISSOCK(os.stat(path).st_mode):
             return path
@@ -77,9 +77,13 @@ class Client:
             prefix = "http+unix"
             port = ""
         else:
-            host = self.serverName
-            prefix = "http"
-            port = ":" + str(DEFAULT_PORT)
+            if ":" in self.serverName:
+                host = self.serverName.split(":")[0]
+                port = ":" + self.serverName.split(":")[1]
+            else:
+                host = self.serverName
+                port = ":" + str(DEFAULT_PORT)
+            prefix = "https"
 
         if not path.startswith("/"):
             path = "/" + path
@@ -87,14 +91,11 @@ class Client:
 
     def _build_env_(self):
         discoveryapi = self.get("/discovery")
-        log.info(discoveryapi)
         lang = os.getenv('LANG')
         if not lang:
             lang = "en_FR.UTF-8"
         locales = self.get("/locale/%s" % lang)
-        log.info(locales)
         render = self.get("/render")
-        log.info(render['render'])
         Renderer.load_render(render['render'])
         Command.build(discoveryapi)
         return True
@@ -106,7 +107,7 @@ class Client:
             thepass = getpass.getpass("Password : ")
             r1 = self.conn.get(self._get_url("/login"), auth=(self.userName, thepass), cookies=self._cookies)
         if r1.status_code == 200:
-            decoded = self._decode_response(r1.content)
+            decoded = json.loads(r1.content.decode('utf-8'))
             self._token = decoded['token']
             return self._build_env_()
         elif r1.status_code == 403:
@@ -125,6 +126,9 @@ class Client:
             self.userName = pwd.getpwuid(os.getuid())[0]
             self.serverName = "local"
             self.path = get_socket_file()
+            if not self.path:
+                print('No socked found')
+                return False
             self.url = self._get_url("/")
             self.conn = requests_unixsocket.Session()
         else:
@@ -134,20 +138,30 @@ class Client:
             self.url = self._get_url("/")
             self.conn = requests.Session()
 
-        r1 = self.conn.get(self._get_url("/ping"), cookies=self._cookies)
-        self._cookies = r1.cookies
-        if r1.status_code == 200:
-            self._secret = json.loads(r1.content)['secret']
-            return self.login()
-        else:
-            self.disconnect()
+        try:
+            r1 = self.conn.get(self._get_url("/ping"), cookies=self._cookies, verify=False)
+            self._cookies = r1.cookies
+            if r1.status_code == 200:
+                self._secret = json.loads(r1.content.decode('utf-8'))['secret']
+                return self.login()
+            else:
+                self.disconnect()
+                return False
+        except Exception as exc:
+            print(exc)
+            if self.conn:
+                self.conn.close()
+            self.conn = None
+            self._secret = None
+            self._cookies = None
+            self._token = None
             return False
 
     def _decode_response(self, content):
-        data = json.loads(content)
+        data = json.loads(content.decode('utf-8'))
         signed = jws.verify(data, self._secret, algorithms=['HS256'])
         decoded = json.loads(signed.decode("utf8"))
-        print(json.dumps(decoded, sort_keys=True, indent=4, separators=(',', ': ')))
+        log.debug(json.dumps(decoded, sort_keys=True, indent=4, separators=(',', ': ')))
         return decoded
 
     def query(self, verb, path, data=None):
@@ -155,7 +169,7 @@ class Client:
             r = requests.Request(verb, self._get_url(path), json=data, headers=self._get_headers(),
                                  cookies=self._cookies)
             prepped = self.conn.prepare_request(r)
-            r1 = self.conn.send(prepped)
+            r1 = self.conn.send(prepped, verify=False)
             if r1.status_code == 200:
                 return self._decode_response(r1.content)
             elif r1.status_code == 401:

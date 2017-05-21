@@ -1,4 +1,4 @@
-from ... import client
+from ...client import client
 from ...constants import SHELL_STATUS_RUN
 
 

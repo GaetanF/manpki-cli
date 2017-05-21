@@ -1,17 +1,45 @@
 import readline
+from . import Command
+from ..constants import current_context
 from ..logger import log
 
 
 class BufferAwareCompleter:
-    def __init__(self, options):
-        self.options = options
-        self.current_candidates = []
-        return
+    _options = {}
+    _current_candidates = []
 
-    def complete(self, text, state):
+    @staticmethod
+    def reset_complete():
+        BufferAwareCompleter._options = {}
+
+    @staticmethod
+    def _build_default():
+        options = {}
+        for dft in ["info", "help", "history", "connect", "disconnect", "exit", "end", "show"]:
+            options[dft] = []
+        return options
+
+    @staticmethod
+    def build_complete():
+        cmds = Command.get_commands_context(current_context)
+        BufferAwareCompleter._options = BufferAwareCompleter._build_default()
+        for cmd in cmds:
+            token_split = cmd.get_command().split(' ')
+            if ' '.join(token_split[:-1]) not in BufferAwareCompleter._options.keys():
+                BufferAwareCompleter._options[' '.join(token_split[:-1])] = []
+            if len(token_split) > 1 and token_split[-1] not in BufferAwareCompleter._options[' '.join(token_split[:-1])]:
+                BufferAwareCompleter._options[' '.join(token_split[:-1])].append(token_split[-1])
+        for ctxt in Command.get_all_context():
+            if ctxt not in BufferAwareCompleter._options.keys():
+                BufferAwareCompleter._options[ctxt] = []
+        log.debug("build_complete")
+
+    @staticmethod
+    def complete(text, state):
         response = None
         if state == 0:
             # This is the first time for this text, so build a match list.
+            BufferAwareCompleter.build_complete()
 
             origline = readline.get_line_buffer()
             begin = readline.get_begidx()
@@ -19,41 +47,33 @@ class BufferAwareCompleter:
             being_completed = origline[begin:end]
             words = origline.split()
 
-            log.debug('origline=%s', repr(origline))
-            log.debug('begin=%s', begin)
-            log.debug('end=%s', end)
-            log.debug('being_completed=%s', being_completed)
-            log.debug('words=%s', words)
-
             if not words:
-                self.current_candidates = sorted(self.options.keys())
+                BufferAwareCompleter._current_candidates = sorted(BufferAwareCompleter._options.keys())
             else:
                 try:
                     if begin == 0:
                         # first word
-                        candidates = self.options.keys()
+                        candidates = BufferAwareCompleter._options.keys()
                     else:
                         # later word
-                        first = words[0]
-                        candidates = self.options[first]
+                        first = ' '.join(words[:repr(origline).count(' ')])
+                        candidates = BufferAwareCompleter._options[first]
 
                     if being_completed:
                         # match options with portion of input
                         # being completed
-                        self.current_candidates = [w for w in candidates
+                        BufferAwareCompleter._current_candidates = [w for w in candidates
                                                    if w.startswith(being_completed)]
                     else:
                         # matching empty string so use all candidates
-                        self.current_candidates = candidates
-
-                    log.debug('candidates=%s', self.current_candidates)
+                        BufferAwareCompleter._current_candidates = candidates
 
                 except (KeyError, IndexError) as err:
                     log.error('completion error: %s', err)
-                    self.current_candidates = []
+                    BufferAwareCompleter._current_candidates = []
 
         try:
-            response = self.current_candidates[state]
+            response = BufferAwareCompleter._current_candidates[state]
         except IndexError:
             response = None
         log.debug('complete(%s, %s) => %s', repr(text), state, response)

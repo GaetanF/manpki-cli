@@ -7,10 +7,11 @@ try:
 except ImportError:
     have_colorlog = False
 
+
 def mk_logger():
-    log = logging.getLogger() # root logger
-    log.setLevel(logging.DEBUG)
-    format      = '%(asctime)s - %(levelname)-8s - %(message)s'
+    thelog = logging.getLogger() # root logger
+    thelog.setLevel(logging.INFO)
+    format = '%(asctime)s - %(levelname)-8s - %(message)s'
     date_format = '%Y-%m-%d %H:%M:%S'
     if have_colorlog and os.isatty(2):
         cformat = '%(log_color)s' + format
@@ -22,7 +23,7 @@ def mk_logger():
         f = logging.Formatter(format, date_format)
     ch = logging.StreamHandler()
     ch.setFormatter(f)
-    log.addHandler(ch)
+    thelog.addHandler(ch)
     return logging.getLogger(__name__)
 
 log = mk_logger()

@@ -1,4 +1,4 @@
-from ... import client
+from ...client import client
 from ...constants import SHELL_STATUS_RUN
 
 
@@ -6,8 +6,8 @@ def connect(args):
     if client.is_connected():
         client.disconnect()
     if len(args) > 0:
-        print(args[0])
-        msg = client.connect(args[0])
+        print(''.join(args))
+        msg = client.connect(''.join(args))
     else:
         msg = client.connect(None, use_socket=True)
     if not msg:

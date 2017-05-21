@@ -12,6 +12,12 @@ class Command:
     _path = None
     _endpoint = None
 
+    type_data = {
+        "str": "[^ ]+",
+        "int": "[0-9]*",
+        "mail": "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+    }
+
     _listcmds = []
     _all_contexts = []
 
@@ -53,17 +59,17 @@ class Command:
         if data and self._params:
             for param in self._params:
                 if param['mandatory'] and (
-                        param['name'] not in data.keys() or data[param['name']].__class__.__name__ != param['type']):
+                        param['name'] not in data.keys() or not re.match(self.type_data[param['type']], data[param['name']])):
                     return False
-                elif param['name'] in data.keys() and data[param['name']].__class__.__name__ != param['type']:
+                elif param['name'] in data.keys() and not re.match(self.type_data[param['type']], data[param['name']]):
                     return False
         return True
 
     def execute(self, cmdargs, client):
         (url, data) = self._parse_cmd(cmdargs)
         if self.has_enough_data(data):
-            log.info(url)
-            log.info(data)
+            log.debug(url)
+            log.debug(data)
             if self._method == "GET":
                 body = client.get(url)
             elif self._method == "PUT":
@@ -72,7 +78,7 @@ class Command:
                 body = client.post(url, data=data)
             else:
                 body = None
-                log.info('Method not implemented')
+                log.debug('Method not implemented')
         else:
             body = "Missing parameter"
 
@@ -104,9 +110,9 @@ class Command:
             param.append(listLexer[i])
             args = args.replace(listLexer[i], "")
         data = None
-        log.info(self._method)
-        log.info(len(param))
-        log.info(param)
+        log.debug(self._method)
+        log.debug(len(param))
+        log.debug(param)
         pattern = re.compile("<[^>]*>")
         if self._method == 'GET':
             if len(param) == 0:
@@ -118,8 +124,8 @@ class Command:
         else:
             url = re.sub(pattern, '', self._url)
             data = param
-        log.info(url)
-        log.info(data)
+        log.debug(url)
+        log.debug(data)
         formateddata = {}
         if data:
             for p in data:
@@ -130,7 +136,7 @@ class Command:
                 formateddata.update(fdata)
         else:
             formateddata = data
-        log.info(formateddata)
+        log.debug(formateddata)
         return url, formateddata
 
     @staticmethod
@@ -155,8 +161,6 @@ class Command:
     def get_commands_context(context):
         allcmdincontext = []
         for cmd in Command._listcmds:
-            log.info("Cmd context : '%s'" % cmd.get_context())
-            log.info("Context : '%s'" % context)
             if cmd.get_context() == context or cmd.get_context() == None:
                 allcmdincontext.append(cmd)
         return allcmdincontext
@@ -175,8 +179,8 @@ class Command:
                 if cmd.get_context() == context or not cmd.get_context():
                     thecmd = cmd.get_command().replace('[param]', '[a-zA-Z0-9]*')
                     thecmd = thecmd.replace('[param=value]', '(\s?(?:[a-zA-Z0-9]*)\s=\s"(.+?)")+')
-                    log.info("Testcmd : '%s'" % testcmd)
-                    log.info("Get cmd : '%s'" % thecmd)
+                    log.debug("Testcmd : '%s'" % testcmd)
+                    log.debug("Get cmd : '%s'" % thecmd)
                     match = re.search("^%s$" % thecmd, testcmd)
                     if match:
                         return cmd
@@ -196,11 +200,15 @@ class Command:
                 )
 
     @staticmethod
+    def get_commands():
+        return Command._listcmds
+
+    @staticmethod
     def build(commands):
         Command._all_contexts = []
         Command._listcmds = []
-        log.info(commands)
+        log.debug(commands)
         Command.build_all_commands_from_api(commands)
         Command.build_all_context()
-        log.info(Command._all_contexts)
-        log.info(Command._listcmds)
+        log.debug(Command._all_contexts)
+        log.debug(Command._listcmds)

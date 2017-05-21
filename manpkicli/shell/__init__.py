@@ -8,25 +8,13 @@ import sys
 import traceback
 
 from ..constants import *
-from .. import client
+from ..client import client
 from ..logger import log
 from ..shell.builtins import *
 from ..tools import Command, BufferAwareCompleter
 
 # Hash map to store built-in function name and reference as key and value
 built_in_cmds = {}
-
-# Register our completer function
-readline.set_completer(BufferAwareCompleter(
-    {'list':['files', 'directories'],
-     'print':['byname', 'bysize'],
-     'stop':[],
-    }).complete)
-
-# Use the tab key for completion
-readline.parse_and_bind('tab: complete')
-
-current_context = None
 
 
 def tokenize(string):
@@ -36,6 +24,7 @@ def tokenize(string):
     if "=" in tmpstr:
         for element in tmpstr.split(" "):
             list_cut = element.split("=")
+            log.info(list_cut)
             string = re.sub(element, '%s="%s"' % tuple(list_cut), string)
     list_token = list(shlex.shlex(string))
     return list_token
@@ -59,17 +48,14 @@ def handler_kill(signum, frame):
 def change_context(context):
     global current_context
     if context:
-        log.info('Change context to '+context)
+        log.debug('Change context to '+context)
     else:
-        log.info('Exit context')
+        log.debug('Exit context')
     current_context = context
     return SHELL_STATUS_RUN
 
 
 def execute(cmd_tokens):
-    with open(HISTORY_PATH, 'a') as history_file:
-        history_file.write(' '.join(cmd_tokens) + os.linesep)
-
     if cmd_tokens:
         # Extract command name and arguments from tokens
         cmd_name = cmd_tokens[0]
@@ -149,6 +135,8 @@ def shell_loop():
         try:
             # Read command input
             cmd = input(display_cmd_prompt())
+            with open(HISTORY_PATH, 'a') as history_file:
+                history_file.write(cmd + os.linesep)
             # Tokenize the command input
             cmd_tokens = tokenize(cmd)
             # Preprocess special tokens
@@ -184,18 +172,50 @@ def end(args):
 
 
 def help(args):
-    log.info(current_context)
+    enter_cmd = None
+    if len(args) > 0:
+        enter_cmd = ' '.join(args) + ' '
     allcmds = Command.get_commands_context(current_context)
+    all_help_cmds = []
+    help_cmds = []
     for cmd in built_in_cmds.keys():
-        print(cmd)
+        all_help_cmds.append(cmd)
     for cmd in allcmds:
-        print(cmd.get_command())
+        all_help_cmds.append(cmd.get_command())
+    for cmd in Command.get_all_context():
+        if cmd:
+            all_help_cmds.append(cmd)
+    for cmd in all_help_cmds:
+        if enter_cmd:
+            if cmd.startswith(enter_cmd) and ' '.join(cmd.split(' ')[:enter_cmd.count(' ')+1]) not in help_cmds:
+                help_cmds.append(' '.join(cmd.split(' ')[:enter_cmd.count(' ')+1]))
+        else:
+            help_cmd = cmd.split(' ')[0]
+            if help_cmd not in help_cmds:
+                help_cmds.append(help_cmd)
+    print(*help_cmds, sep='\n')
     return SHELL_STATUS_RUN
+
+
+def post_complete(substitution, matches, longest_match_length):
+    curr_line = readline.get_line_buffer()
+    maxlen=0
+    for item in matches:
+        if len(item)+1 > maxlen:
+            maxlen=len(item)+1
+    print("")
+    for item in matches:
+        if item != "" and item[0] != " ":
+            item = " " + item + (" " * (maxlen - len(item)+1 + 10)) + "help"
+        print(item)
+    sys.stdout.write(display_cmd_prompt() + curr_line)
+    sys.stdout.flush()
+    readline.redisplay()
 
 
 # Register all built-in commands here
 def init():
-    register_command("cd", cd)
+    #register_command("cd", cd)
     register_command("exit", exit)
     register_command("end", end)
     register_command("history", history)
@@ -204,6 +224,15 @@ def init():
     register_command("help", help)
     register_command("info", info)
     register_command("show", show)
+
+    readline.set_history_length(1000)
+    if os.path.exists(HISTORY_PATH):
+        readline.read_history_file(HISTORY_PATH)
+    readline.set_history_length(1000)
+
+    readline.set_completer(BufferAwareCompleter.complete)
+    readline.set_completion_display_matches_hook(post_complete)
+    readline.parse_and_bind('tab: complete')
 
 
 def main():
