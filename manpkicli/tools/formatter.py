@@ -1,4 +1,6 @@
 import string
+from ..logger import log
+
 
 class SuperFormatter(string.Formatter):
     """World's simplest Template engine."""
@@ -35,6 +37,8 @@ class SuperFormatter(string.Formatter):
 
     @staticmethod
     def generate_list(header, list):
+        if header == ['']:
+            header = list.keys()
         max_header_length = 0
         for head in header:
             if len(head) > max_header_length:

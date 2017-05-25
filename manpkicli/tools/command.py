@@ -16,7 +16,9 @@ class Command:
     type_data = {
         "str": "[^ ]+",
         "int": "[0-9]*",
-        "mail": "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
+        "float": "[0-9]*\.[0-9]*",
+        "bool": "^(?i:true|false)$",
+        "Mail": "(^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$)"
     }
 
     _listcmds = []
@@ -71,11 +73,25 @@ class Command:
                     return False
         return True
 
+    def _set_type_args(self, data):
+        if data:
+            for k, v in list(data.items()):
+                for param in self._params:
+                    if param['name'] == k and self.type_data[param['type']]:
+                        if param['type'] == 'int':
+                            data[k] = int(v)
+                        elif param['type'] == 'float':
+                            data[k] = float(v)
+                        elif param['type'] == 'bool':
+                            data[k] = v.lower() in ("yes", "true", "t", "1")
+        return data
+
     def execute(self, cmdargs, client):
         (url, data) = self._parse_cmd(cmdargs)
         if self.has_enough_data(data):
             log.debug(url)
             log.debug(data)
+            data = self._set_type_args(data)
             if self._method == "GET":
                 body = client.get(url)
             elif self._method == "PUT":
@@ -89,6 +105,7 @@ class Command:
             body = "Missing parameter"
 
         if body and body != 'You are disconnected !':
+            log.debug(self._endpoint)
             if self._render and Renderer.render_exist(self._render):
                 return Renderer.render(body, self._render)
             elif Renderer.render_exist(self._endpoint):
