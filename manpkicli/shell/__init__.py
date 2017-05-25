@@ -215,7 +215,6 @@ def post_complete(substitution, matches, longest_match_length):
 
 # Register all built-in commands here
 def init():
-    #register_command("cd", cd)
     register_command("exit", exit)
     register_command("end", end)
     register_command("history", history)
@@ -224,6 +223,7 @@ def init():
     register_command("help", help)
     register_command("info", info)
     register_command("show", show)
+    register_command("debug", debug)
 
     readline.set_history_length(1000)
     if os.path.exists(HISTORY_PATH):

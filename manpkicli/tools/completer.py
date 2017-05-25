@@ -15,7 +15,7 @@ class BufferAwareCompleter:
     @staticmethod
     def _build_default():
         options = {}
-        for dft in ["info", "help", "history", "connect", "disconnect", "exit", "end", "show"]:
+        for dft in ["info", "help", "history", "connect", "disconnect", "exit", "end", "show", "debug"]:
             options[dft] = []
         return options
 

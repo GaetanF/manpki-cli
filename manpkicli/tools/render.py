@@ -31,26 +31,3 @@ class Renderer:
             return True
         else:
             return False
-
-    @staticmethod
-    def print_table(header, list):
-        size_cols = []
-        line = '+'
-        for i in range(0, len(header)):
-            size_cols.append(len(header[i]) + 2)
-        for element in list:
-            for i in range(0, len(header)):
-                if len(element[i]) + 2 > size_cols[i]:
-                    size_cols[i] = len(element[i]) + 2
-        for col in size_cols:
-            line += '-' * col + '+'
-        table = line + '\n|'
-        for i in range(0, len(header)):
-            table += " " + header[i] + (" " * (size_cols[i] - len(header[i]) - 1)) + "|"
-        table += "\n" + line + "\n"
-        for element in list:
-            table += "|"
-            for i in range(0, len(header)):
-                table += " " + element[i] + (" " * (size_cols[i] - len(element[i]) - 1)) + "|"
-            table += "\n"
-        print(table + line + "\n")

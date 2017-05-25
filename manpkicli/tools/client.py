@@ -1,15 +1,18 @@
-import os
 import pwd
 import stat
 import requests
 import requests_unixsocket
 import json
 import getpass
-import urllib3
 from jose import jws
 from ..constants import *
 from ..logger import log
 from ..tools import Renderer, Command
+
+
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 
 def get_socket_file(paths=None):
@@ -104,6 +107,7 @@ class Client:
         if self.use_socket:
             r1 = self.conn.get(self._get_url("/login"), auth=(self.userName, 'null'), cookies=self._cookies)
         else:
+            print("Username : "+self.userName)
             thepass = getpass.getpass("Password : ")
             r1 = self.conn.get(self._get_url("/login"), auth=(self.userName, thepass), cookies=self._cookies)
         if r1.status_code == 200:
@@ -132,8 +136,12 @@ class Client:
             self.url = self._get_url("/")
             self.conn = requests_unixsocket.Session()
         else:
-            self.userName = server.split('@')[0]
-            self.serverName = server.split('@')[1]
+            if '@' in server:
+                self.userName = server.split('@')[0]
+                self.serverName = server.split('@')[1]
+            else:
+                self.serverName = server
+                self.userName = pwd.getpwuid(os.getuid())[0]
             self.path = None
             self.url = self._get_url("/")
             self.conn = requests.Session()

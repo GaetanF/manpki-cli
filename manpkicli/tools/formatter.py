@@ -1,6 +1,5 @@
 import string
 
-
 class SuperFormatter(string.Formatter):
     """World's simplest Template engine."""
 
@@ -10,7 +9,8 @@ class SuperFormatter(string.Formatter):
                 return arg[field_name], None
         return string.Formatter.get_field(self, field_name, args, kwargs)
 
-    def generate_table(self, header, table):
+    @staticmethod
+    def generate_table(header, table):
         items = table
         size_cols = []
         line = '+'
@@ -33,6 +33,21 @@ class SuperFormatter(string.Formatter):
             graph_table += "\n"
         return graph_table + line + "\n"
 
+    @staticmethod
+    def generate_list(header, list):
+        max_header_length = 0
+        for head in header:
+            if len(head) > max_header_length:
+                max_header_length = len(head)
+        graph_list = ''
+        for head in header:
+            if isinstance(list[head], str):
+                item = list[head]
+            else:
+                item = str(list[head])
+            graph_list += head + ' '*(max_header_length-len(head)+2) + ': '+item+'\n'
+        return graph_list
+
     def format_field(self, value, spec):
         if spec.startswith('repeat'):
             template = spec.partition(':')[-1]
@@ -41,6 +56,8 @@ class SuperFormatter(string.Formatter):
             return ''.join([template.format(item=item) for item in value])
         elif spec.startswith('table'):
             return self.generate_table(spec.partition(':')[-1].split('|'), value)
+        elif spec.startswith('list'):
+            return self.generate_list(spec.partition(':')[-1].split('|'), value)
         elif spec == 'call':
             return value()
         elif spec.startswith('if'):

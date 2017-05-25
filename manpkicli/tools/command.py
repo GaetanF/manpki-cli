@@ -11,6 +11,7 @@ class Command:
     _context = None
     _path = None
     _endpoint = None
+    _render = None
 
     type_data = {
         "str": "[^ ]+",
@@ -21,13 +22,14 @@ class Command:
     _listcmds = []
     _all_contexts = []
 
-    def __init__(self, path, url, method, endpoint, context=None, params=None):
+    def __init__(self, path, url, method, endpoint, context=None, params=None, render=None):
         self._url = url
         self._path = path
         self._method = method
         self._endpoint = endpoint
         self._context = context
         self._params = params
+        self._render = render
 
     def get_context(self):
         return self._context
@@ -41,18 +43,22 @@ class Command:
     def get_function(self):
         return self._function
 
+    def get_render(self):
+        return self._render
+
     @staticmethod
     def get_all_context():
         return Command._all_contexts
 
     def __repr__(self):
-        return "<Command cmd: {}, url: {}, method: {}, context: {}, endpoint: {}, params: {}>".format(
+        return "<Command cmd: {}, url: {}, method: {}, context: {}, endpoint: {}, params: {}, render : {}>".format(
             self._path,
             self._url,
             self._method,
             self._context,
             self._endpoint,
-            self._params
+            self._params,
+            self._render
         )
 
     def has_enough_data(self, data):
@@ -83,7 +89,9 @@ class Command:
             body = "Missing parameter"
 
         if body and body != 'You are disconnected !':
-            if Renderer.render_exist(self._endpoint):
+            if self._render and Renderer.render_exist(self._render):
+                return Renderer.render(body, self._render)
+            elif Renderer.render_exist(self._endpoint):
                 return Renderer.render(body, self._endpoint)
             else:
                 return body
@@ -147,14 +155,15 @@ class Command:
                 Command._all_contexts.append(cmd.get_context())
 
     @staticmethod
-    def add(path, url, method, context, endpoint=None, params=None):
+    def add(path, url, method, context, endpoint=None, params=None, render=None):
         Command._listcmds.append(Command(
             path=path,
             url=url,
             method=method,
             endpoint=endpoint,
             params=params,
-            context=context
+            context=context,
+            render=render
         ))
 
     @staticmethod
@@ -196,7 +205,8 @@ class Command:
                     method=command['method'],
                     endpoint=command['endpoint'],
                     context=command['context'],
-                    params=command['args']
+                    params=command['args'],
+                    render=command['render']
                 )
 
     @staticmethod
