@@ -46,12 +46,12 @@ def handler_kill(signum, frame):
 
 
 def change_context(context):
-    global current_context
     if context:
         log.debug('Change context to '+context)
     else:
         log.debug('Exit context')
-    current_context = context
+    import builtins
+    builtins.current_context = context
     return SHELL_STATUS_RUN
 
 
@@ -103,8 +103,10 @@ def display_cmd_prompt():
         connected = "\033[92m"
 
     path = ""
-    if globals()['current_context']:
-        path = " \033[0m("+globals()['current_context']+")"+connected
+    log.debug(__builtins__)
+    import builtins
+    if 'current_context' in __builtins__ and builtins.current_context:
+        path = " \033[0m("+builtins.current_context+")"+connected
 
     # Print out to console
     return "%s[%s %s]%s$\033[0m " % (connected, client.get_servername(), base_dir, path)
@@ -120,11 +122,14 @@ def ignore_signals():
     if platform.system() != "Windows":
         signal.signal(signal.SIGTSTP, signal.SIG_IGN)
     # Ignore Ctrl-C interrupt signal
-    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    #signal.signal(signal.SIGINT, signal.SIG_IGN)
 
 
-def shell_loop():
-    pre_shell()
+def read_input():
+    return input(display_cmd_prompt())
+
+
+def shell_loop(signum=None, frame=None):
     status = SHELL_STATUS_RUN
 
     while status == SHELL_STATUS_RUN:
@@ -134,7 +139,7 @@ def shell_loop():
 
         try:
             # Read command input
-            cmd = input(display_cmd_prompt())
+            cmd = read_input()
             with open(HISTORY_PATH, 'a') as history_file:
                 history_file.write(cmd + os.linesep)
             # Tokenize the command input
@@ -144,6 +149,10 @@ def shell_loop():
             cmd_tokens = preprocess(cmd_tokens)
             # Execute the command and retrieve new status
             status = execute(cmd_tokens)
+        except EOFError:
+            status = exit()
+        except KeyboardInterrupt:
+            sys.stdout.write('\n')
         except:
             _, err, _ = sys.exc_info()
             print(err)
@@ -181,7 +190,8 @@ def help(args):
     for cmd in built_in_cmds.keys():
         all_help_cmds.append(cmd)
     for cmd in allcmds:
-        all_help_cmds.append(cmd.get_command())
+        if cmd:
+            all_help_cmds.append(cmd.get_command())
     for cmd in Command.get_all_context():
         if cmd:
             all_help_cmds.append(cmd)
@@ -189,10 +199,11 @@ def help(args):
         if enter_cmd:
             if cmd.startswith(enter_cmd) and ' '.join(cmd.split(' ')[:enter_cmd.count(' ')+1]) not in help_cmds:
                 help_cmds.append(' '.join(cmd.split(' ')[:enter_cmd.count(' ')+1]))
-        else:
+        elif cmd:
             help_cmd = cmd.split(' ')[0]
             if help_cmd not in help_cmds:
                 help_cmds.append(help_cmd)
+    # @TODO : add description for each help command
     print(*help_cmds, sep='\n')
     return SHELL_STATUS_RUN
 
@@ -238,6 +249,8 @@ def init():
 def main():
     # Init shell before starting the main loop
     init()
+    pre_shell()
+    #signal.signal(signal.SIGINT, signal.SIG_IGN)
     shell_loop()
 
 if __name__ == "__main__":

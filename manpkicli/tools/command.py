@@ -45,6 +45,9 @@ class Command:
     def get_function(self):
         return self._function
 
+    def get_params(self):
+        return self._params
+
     def get_render(self):
         return self._render
 
@@ -187,7 +190,7 @@ class Command:
     def get_commands_context(context):
         allcmdincontext = []
         for cmd in Command._listcmds:
-            if cmd.get_context() == context or cmd.get_context() == None:
+            if cmd.get_command() and cmd.get_context() == context or cmd.get_context() == None:
                 allcmdincontext.append(cmd)
         return allcmdincontext
 
@@ -204,7 +207,24 @@ class Command:
             for cmd in Command._listcmds:
                 if cmd.get_context() == context or not cmd.get_context():
                     thecmd = cmd.get_command().replace('[param]', '[a-zA-Z0-9]*')
-                    thecmd = thecmd.replace('[param=value]', '(\s?(?:[a-zA-Z0-9]*)\s=\s"(.+?)")+')
+                    thecmd = thecmd.replace('[param=value]', '(\s?(?:[a-zA-Z0-9]*)\s?=\s?"?(.+?)"?)+')
+                    log.debug("Testcmd : '%s'" % testcmd)
+                    log.debug("Get cmd : '%s'" % thecmd)
+                    match = re.search("^%s$" % thecmd, testcmd)
+                    if match:
+                        return cmd
+        return None
+
+    @staticmethod
+    def search_completer_command(command, context):
+        listcmd = command.split(' ')
+        sizearray = len(listcmd)
+        for x in reversed(range(0, sizearray + 1)):
+            testcmd = ' '.join(listcmd[:x])
+            for cmd in Command._listcmds:
+                if cmd.get_context() == context or not cmd.get_context():
+                    thecmd = cmd.get_command().replace('[param]', '[a-zA-Z0-9]*')
+                    thecmd = thecmd.replace('[param=value]', '(\s?(?:[a-zA-Z0-9]*)\s?=\s?"?(.+?)"?)*')
                     log.debug("Testcmd : '%s'" % testcmd)
                     log.debug("Get cmd : '%s'" % thecmd)
                     match = re.search("^%s$" % thecmd, testcmd)
